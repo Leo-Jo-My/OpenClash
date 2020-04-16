@@ -8,6 +8,11 @@ local fs = require "luci.openclash"
 local uci = require("luci.model.uci").cursor()
 local CHIF = "0"
 
+font_green = [[<font color="green">]]
+font_off = [[</font>]]
+bold_on  = [[<strong>]]
+bold_off = [[</strong>]]
+
 function IsYamlFile(e)
    e=e or""
    local e=string.lower(string.sub(e,-5,-1))
@@ -18,8 +23,59 @@ function IsYmlFile(e)
    local e=string.lower(string.sub(e,-4,-1))
    return e == ".yml"
 end
+
+function config_check(CONFIG_FILE)
+  local yaml = fs.isfile(CONFIG_FILE)
+  local proxy,group,rule
+  if yaml then
+  	 proxy_provier = luci.sys.call(string.format('egrep "^ {0,}proxy-provider:" "%s" >/dev/null 2>&1',CONFIG_FILE))
+  	 if (proxy_provier ~= 0) then
+  	    proxy_provier = luci.sys.call(string.format('egrep "^ {0,}proxy-providers:" "%s" >/dev/null 2>&1',CONFIG_FILE))
+  	 end
+     proxy = luci.sys.call(string.format('egrep "^ {0,}Proxy:" "%s" >/dev/null 2>&1',CONFIG_FILE))
+     if (proxy ~= 0) then
+        proxy = luci.sys.call(string.format('egrep "^proxies:" "%s" >/dev/null 2>&1',CONFIG_FILE))
+     end
+     group = luci.sys.call(string.format('egrep " {0,}Proxy Group" "%s" >/dev/null 2>&1',CONFIG_FILE))
+     if (group ~= 0) then
+     	  group = luci.sys.call(string.format('egrep "^ {0,}proxy-groups:" "%s" >/dev/null 2>&1',CONFIG_FILE))
+     end
+     rule = luci.sys.call(string.format('egrep "^ {0,}Rule:" "%s" >/dev/null 2>&1',CONFIG_FILE))
+     if (rule ~= 0) then
+        rule = luci.sys.call(string.format('egrep "^ {0,}rules:" "%s" >/dev/null 2>&1',CONFIG_FILE))
+     end
+  end
+  if yaml then
+     if (proxy == 0) then
+        proxy = ""
+     else
+        if (proxy_provier == 0) then
+           proxy = ""
+        else
+           proxy = " - 代理服务器"
+        end
+     end
+     if (group == 0) then
+        group = ""
+     else
+        group = " - 策略组"
+     end
+     if (rule == 0) then
+        rule = ""
+     else
+        rule = " - 规则"
+     end
+     if (proxy=="") and (group=="") and (rule=="") then
+        return "Config Normal"
+     else
+	      return proxy..group..rule.." - 部分异常"
+	   end
+	elseif (yaml ~= 0) then
+	   return "配置文件不存在"
+	end
+end
     
-ful = SimpleForm("upload", translate("Server Config"), nil)
+ful = SimpleForm("upload", translate("Config Manage"), nil)
 ful.reset = false
 ful.submit = false
 
@@ -77,6 +133,7 @@ HTTP.setfilehandler(
 			else
 				 um.value = translate("File saved to") .. ' "/etc/openclash/proxy_provider/"'
 			end
+			fs.unlink("/tmp/Proxy_Group")
 		end
 	end
 )
@@ -88,6 +145,16 @@ if HTTP.formvalue("upload") then
 	end
 end
 
+local function i(e)
+local t=0
+local a={' KB',' MB',' GB',' TB'}
+repeat
+e=e/1024
+t=t+1
+until(e<=1024)
+return string.format("%.1f",e)..a[t]
+end
+
 local e,a={}
 for t,o in ipairs(fs.glob("/etc/openclash/config/*"))do
 a=fs.stat(o)
@@ -95,27 +162,21 @@ if a then
 e[t]={}
 e[t].name=fs.basename(o)
 BACKUP_FILE="/etc/openclash/backup/".. e[t].name
-e[t].mtime=os.date("%Y-%m-%d %H:%M:%S",fs.mtime(BACKUP_FILE)) or os.date("%Y-%m-%d %H:%M:%S",a.mtime)
-if string.sub(luci.sys.exec("uci get openclash.config.config_path"), 23, -2) == e[t].name then
+CONFIG_FILE="/etc/openclash/config/".. e[t].name
+if fs.mtime(BACKUP_FILE) then
+   e[t].mtime=os.date("%Y-%m-%d %H:%M:%S",fs.mtime(BACKUP_FILE))
+else
+   e[t].mtime=os.date("%Y-%m-%d %H:%M:%S",a.mtime)
+end
+if string.sub(luci.sys.exec("uci get openclash.config.config_path 2>/dev/null"), 23, -2) == e[t].name then
    e[t].state=translate("Enable")
 else
    e[t].state=translate("Disable")
 end
-e[t].size=tostring(a.size)
+e[t].size=i(a.size)
+e[t].check=translate(config_check(CONFIG_FILE))
 e[t].remove=0
-e[t].enable=false
 end
-end
-
-function IsYamlFile(e)
-   e=e or""
-   local e=string.lower(string.sub(e,-5,-1))
-   return e == ".yaml"
-end
-function IsYmlFile(e)
-   e=e or""
-   local e=string.lower(string.sub(e,-4,-1))
-   return e == ".yml"
 end
     
 form=SimpleForm("config_file_list",translate("Config File List"))
@@ -123,9 +184,12 @@ form.reset=false
 form.submit=false
 tb=form:section(Table,e)
 st=tb:option(DummyValue,"state",translate("State"))
+st.template="openclash/cfg_check"
 nm=tb:option(DummyValue,"name",translate("Config Alias"))
 mt=tb:option(DummyValue,"mtime",translate("Update Time"))
 sz=tb:option(DummyValue,"size",translate("Size"))
+ck=tb:option(DummyValue,"check",translate("启动参数检查"))
+ck.template="openclash/cfg_check"
 
 btnis=tb:option(Button,"switch",translate("Switch Config"))
 btnis.template="openclash/other_button"
@@ -140,6 +204,7 @@ o.inputstyle="apply"
 Button.render(o,t,a)
 end
 btnis.write=function(a,t)
+fs.unlink("/tmp/Proxy_Group")
 luci.sys.exec(string.format('uci set openclash.config.config_path="/etc/openclash/config/%s"',e[t].name))
 uci:commit("openclash")
 HTTP.redirect(luci.dispatcher.build_url("admin", "services", "openclash", "config"))
@@ -184,8 +249,9 @@ e.inputstyle="reset"
 Button.render(e,t,a)
 end
 btnrm.write=function(a,t)
-local a=fs.unlink("/etc/openclash/config/"..luci.openclash.basename(e[t].name))
-local db=fs.unlink("/etc/openclash/backup/"..luci.openclash.basename(e[t].name))
+	fs.unlink("/tmp/Proxy_Group")
+	fs.unlink("/etc/openclash/backup/"..luci.openclash.basename(e[t].name))
+	local a=fs.unlink("/etc/openclash/config/"..luci.openclash.basename(e[t].name))
 if a then table.remove(e,t)end
 return a
 end
@@ -197,7 +263,7 @@ if r then
 p[x]={}
 p[x].name=fs.basename(y)
 p[x].mtime=os.date("%Y-%m-%d %H:%M:%S",r.mtime)
-p[x].size=tostring(r.size)
+p[x].size=i(r.size)
 p[x].remove=0
 p[x].enable=false
 end
@@ -265,13 +331,15 @@ local tab = {
 
 s = m:section(Table, tab)
 
-local conf = string.sub(luci.sys.exec("uci get openclash.config.config_path"), 1, -2)
+local conf = string.sub(luci.sys.exec("uci get openclash.config.config_path 2>/dev/null"), 1, -2)
 local dconf = "/etc/openclash/default.yaml"
+local conf_name = fs.basename(conf)
+if not conf_name then conf_name = "config.yaml" end
 
 sev = s:option(Value, "user")
 sev.template = "cbi/tvalue"
-sev.description = translate("You Can Modify config file Here, Except The Settings That Were Taken Over")
-sev.rows = 20
+sev.description = translate("Modify Your Config file:").." "..font_green..bold_on..conf_name..bold_off..font_off.." "..translate("Here, Except The Settings That Were Taken Over")
+sev.rows = 40
 sev.wrap = "off"
 sev.cfgvalue = function(self, section)
 	return NXFS.readfile(conf) or NXFS.readfile(dconf) or ""
@@ -279,14 +347,14 @@ end
 sev.write = function(self, section, value)
 if (CHIF == "0") then
     value = value:gsub("\r\n?", "\n")
-		NXFS.writefile(conf, value)
+    NXFS.writefile(conf, value)
 end
 end
 
 def = s:option(Value, "default")
 def.template = "cbi/tvalue"
 def.description = translate("Default Config File With Correct General-Settings")
-def.rows = 20
+def.rows = 40
 def.wrap = "off"
 def.readonly = true
 def.cfgvalue = function(self, section)
@@ -306,6 +374,7 @@ o = a:option(Button, "Commit")
 o.inputtitle = translate("Commit Configurations")
 o.inputstyle = "apply"
 o.write = function()
+	fs.unlink("/tmp/Proxy_Group")
   uci:commit("openclash")
 end
 
@@ -313,6 +382,7 @@ o = a:option(Button, "Apply")
 o.inputtitle = translate("Apply Configurations")
 o.inputstyle = "apply"
 o.write = function()
+	fs.unlink("/tmp/Proxy_Group")
   uci:set("openclash", "config", "enable", 1)
   uci:commit("openclash")
   SYS.call("/etc/init.d/openclash restart >/dev/null 2>&1 &")

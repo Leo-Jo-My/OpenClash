@@ -5,14 +5,14 @@
 </h1>
 
   <p align="center">
-	<a target="_blank" href="https://github.com/Dreamacro/clash/releases/tag/v0.17.0">
-    <img src="https://img.shields.io/badge/Clash-v0.17.0-blue.svg">
+	<a target="_blank" href="https://github.com/Dreamacro/clash/releases/tag/v0.19.0">
+    <img src="https://img.shields.io/badge/Clash-v0.19.0-blue.svg">
   </a>
-  <a target="_blank" href="https://github.com/vernesong/OpenClash/tree/v0.36.2-beta">
-    <img src="https://img.shields.io/badge/source code-v0.36.2--beta-green.svg">
+  <a target="_blank" href="https://github.com/vernesong/OpenClash/tree/v0.37.3-beta">
+    <img src="https://img.shields.io/badge/source code-v0.37.3--beta-green.svg">
   </a>
-  <a target="_blank" href="https://github.com/vernesong/OpenClash/releases/tag/v0.36.2-beta">
-    <img src="https://img.shields.io/badge/New Release-v0.36.2--beta-orange.svg">
+  <a target="_blank" href="https://github.com/vernesong/OpenClash/releases/tag/v0.37.3-beta">
+    <img src="https://img.shields.io/badge/New Release-v0.37.3--beta-orange.svg">
   </a>
   </p>
   
@@ -21,7 +21,7 @@
 本插件是一个可运行在 OpenWrt 上的<a href="https://github.com/Dreamacro/clash" target="_blank"> Clash </a>客户端
 </p>
 <p align="center">
-兼容 Shadowsocks、Vmess、Snell 等协议，根据灵活的规则配置实现策略代理
+兼容 Shadowsocks、Vmess、Trojan、Snell 等协议，根据灵活的规则配置实现策略代理
 </p>
 <p align="center">
 - 感谢<a href="https://github.com/frainzy1477" target="_blank"> frainzy1477 </a>，本插件基于<a href="https://github.com/frainzy1477/luci-app-clash" target="_blank"> Luci For Clash </a>进行二次开发 -
@@ -51,9 +51,14 @@
 * coreutils
 * coreutils-nohup
 * bash
-* wget
+* curl
+* jsonfilter
+* ca-certificates
+* ipset
+* ip-full
+* iptables-mod-tproxy
 * kmod-tun(TUN模式)
-* luci-compat(Luci-19.X)
+* luci-compat(Luci-19.07)
 
 
 编译
@@ -110,6 +115,11 @@ make package/luci-app-openclash/luci-app-openclash/compile V=99
 
 请作者喝杯咖啡
 ---
+
+* PayPal
+<p align="left">
+    <a href="https://ko-fi.com/vernesong"><img width="300" src="https://www.ko-fi.com/img/githubbutton_sm.svg"> </a>
+</p>
 
 * 比特币-BTC
 <p align="left">
